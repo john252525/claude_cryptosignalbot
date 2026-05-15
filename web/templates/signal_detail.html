@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <h2 style="margin-top:0;font-size:16px">
+    Signal #{{ sig.id }} — <code>{{ sig.symbol }}</code>
+    <span class="badge {{ sig.side.value }}">{{ sig.side.value }}</span>
+    <span class="badge {{ sig.status.value }}">{{ sig.status.value }}</span>
+  </h2>
+  <div class="grid">
+    <div><div class="stat">Channel</div><div><a href="/signals?channel={{ channel.id }}">{{ channel.title }}</a></div></div>
+    <div><div class="stat">Posted</div><div>{{ sig.posted_at.strftime("%Y-%m-%d %H:%M:%S UTC") }}</div></div>
+    <div><div class="stat">Entered</div><div>{% if sig.entered_at %}{{ sig.entered_at.strftime("%Y-%m-%d %H:%M:%S UTC") }}{% else %}—{% endif %}</div></div>
+    <div><div class="stat">Closed</div><div>{% if sig.closed_at %}{{ sig.closed_at.strftime("%Y-%m-%d %H:%M:%S UTC") }}{% else %}—{% endif %}</div></div>
+    <div><div class="stat">Entry</div><div>{% if sig.entry_low == sig.entry_high %}{{ "%.6g"|format(sig.entry_low) }}{% else %}{{ "%.6g"|format(sig.entry_low) }}–{{ "%.6g"|format(sig.entry_high) }}{% endif %}</div></div>
+    <div><div class="stat">Stop-loss</div><div>{{ "%.6g"|format(sig.stop_loss) }}</div></div>
+    <div><div class="stat">Leverage</div><div>{% if sig.leverage %}{{ sig.leverage }}x{% else %}—{% endif %}</div></div>
+    <div>
+      <div class="stat">P&L</div>
+      <div class="{% if sig.pnl_pct and sig.pnl_pct > 0 %}pos{% elif sig.pnl_pct and sig.pnl_pct < 0 %}neg{% endif %}">
+        {% if sig.pnl_pct is not none %}{{ "%.2f"|format(sig.pnl_pct) }}%{% else %}—{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h3 style="margin-top:0;font-size:14px">Take-profits</h3>
+  <table>
+    <thead><tr><th>#</th><th>Price</th><th>Hit</th></tr></thead>
+    <tbody>
+      {% for tp in sig.take_profits %}
+      <tr>
+        <td>TP{{ loop.index }}</td>
+        <td>{{ "%.6g"|format(tp) }}</td>
+        <td>{% if loop.index0 <= sig.last_tp_hit_index %}<span class="badge CLOSED_TP">hit</span>{% else %}<span class="neutral">—</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="panel">
+  <h3 style="margin-top:0;font-size:14px">Event log</h3>
+  <table>
+    <thead><tr><th>Time</th><th>Event</th><th>Detail</th><th>Price</th></tr></thead>
+    <tbody>
+      {% for e in events %}
+      <tr>
+        <td>{{ e.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+        <td><span class="badge">{{ e.kind }}</span></td>
+        <td>{{ e.detail }}</td>
+        <td>{% if e.price is not none %}{{ "%.6g"|format(e.price) }}{% endif %}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="neutral">No events yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="panel">
+  <h3 style="margin-top:0;font-size:14px">Raw message</h3>
+  <div class="raw">{{ sig.raw_text }}</div>
+</div>
+{% endblock %}

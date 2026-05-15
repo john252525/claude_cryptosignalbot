@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="panel">
+  <div class="grid">
+    <div><div class="stat">Total signals</div><div class="stat-value">{{ overall.total }}</div></div>
+    <div><div class="stat">Pending</div><div class="stat-value">{{ overall.pending }}</div></div>
+    <div><div class="stat">Active</div><div class="stat-value">{{ overall.active }}</div></div>
+    <div><div class="stat">Closed TP</div><div class="stat-value pos">{{ overall.closed_tp }}</div></div>
+    <div><div class="stat">Closed SL</div><div class="stat-value neg">{{ overall.closed_sl }}</div></div>
+    <div>
+      <div class="stat">Winrate</div>
+      <div class="stat-value">{% if overall.winrate is not none %}{{ "%.1f"|format(overall.winrate*100) }}%{% else %}—{% endif %}</div>
+    </div>
+    <div>
+      <div class="stat">Avg P&L</div>
+      <div class="stat-value {% if overall.avg_pnl_pct and overall.avg_pnl_pct > 0 %}pos{% elif overall.avg_pnl_pct and overall.avg_pnl_pct < 0 %}neg{% endif %}">
+        {% if overall.avg_pnl_pct is not none %}{{ "%.2f"|format(overall.avg_pnl_pct) }}%{% else %}—{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2 style="margin-top:0;font-size:16px">Channel leaderboard</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Channel</th><th>Source</th>
+        <th>Signals</th><th>TP</th><th>SL</th>
+        <th>Winrate</th><th>Avg P&L</th><th>Total P&L</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in channels %}
+      <tr>
+        <td>
+          <a href="/signals?channel={{ c.channel_id }}">{{ c.title }}</a>
+          {% if not c.enabled %}<span class="badge">disabled</span>{% endif %}
+        </td>
+        <td><span class="badge">{{ c.source }}</span></td>
+        <td>{{ c.total }}</td>
+        <td class="pos">{{ c.closed_tp }}</td>
+        <td class="neg">{{ c.closed_sl }}</td>
+        <td>{% if c.winrate is not none %}{{ "%.1f"|format(c.winrate*100) }}%{% else %}<span class="neutral">—</span>{% endif %}</td>
+        <td class="{% if c.avg_pnl_pct and c.avg_pnl_pct > 0 %}pos{% elif c.avg_pnl_pct and c.avg_pnl_pct < 0 %}neg{% endif %}">
+          {% if c.avg_pnl_pct is not none %}{{ "%.2f"|format(c.avg_pnl_pct) }}%{% else %}<span class="neutral">—</span>{% endif %}
+        </td>
+        <td class="{% if c.total_pnl_pct and c.total_pnl_pct > 0 %}pos{% elif c.total_pnl_pct and c.total_pnl_pct < 0 %}neg{% endif %}">
+          {% if c.total_pnl_pct is not none %}{{ "%.2f"|format(c.total_pnl_pct) }}%{% else %}<span class="neutral">—</span>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="neutral">No channels yet. Configure a Telegram source and forward a signal.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <form class="filters" method="get" action="/signals">
+    <select name="channel">
+      <option value="">all channels</option>
+      {% for cid, ch in channels.items() %}
+      <option value="{{ cid }}" {% if filter_channel == cid %}selected{% endif %}>{{ ch.title }}</option>
+      {% endfor %}
+    </select>
+    <select name="status">
+      <option value="">any status</option>
+      {% for s in statuses %}
+      <option value="{{ s }}" {% if filter_status == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">filter</button>
+    <a href="/signals" style="align-self:center;font-size:13px">clear</a>
+  </form>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Time</th><th>Channel</th><th>Symbol</th><th>Side</th>
+        <th>Entry</th><th>TP</th><th>SL</th>
+        <th>Status</th><th>TPs hit</th><th>P&L</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in signals %}
+      <tr>
+        <td><a href="/signals/{{ s.id }}">{{ s.posted_at.strftime("%m-%d %H:%M") }}</a></td>
+        <td>{{ channels[s.channel_id].title if s.channel_id in channels else "?" }}</td>
+        <td><code>{{ s.symbol }}</code></td>
+        <td><span class="badge {{ s.side.value }}">{{ s.side.value }}</span></td>
+        <td>{% if s.entry_low == s.entry_high %}{{ "%.6g"|format(s.entry_low) }}{% else %}{{ "%.6g"|format(s.entry_low) }}–{{ "%.6g"|format(s.entry_high) }}{% endif %}</td>
+        <td>{% for tp in s.take_profits %}{{ "%.6g"|format(tp) }}{% if not loop.last %}, {% endif %}{% endfor %}</td>
+        <td>{{ "%.6g"|format(s.stop_loss) }}</td>
+        <td><span class="badge {{ s.status.value }}">{{ s.status.value }}</span></td>
+        <td>{% if s.take_profits %}{{ s.last_tp_hit_index + 1 }}/{{ s.take_profits|length }}{% else %}—{% endif %}</td>
+        <td class="{% if s.pnl_pct and s.pnl_pct > 0 %}pos{% elif s.pnl_pct and s.pnl_pct < 0 %}neg{% endif %}">
+          {% if s.pnl_pct is not none %}{{ "%.2f"|format(s.pnl_pct) }}%{% else %}<span class="neutral">—</span>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="10" class="neutral">No signals match.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

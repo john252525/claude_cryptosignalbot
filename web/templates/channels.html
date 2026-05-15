@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <h2 style="margin-top:0;font-size:16px">Channels</h2>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Title</th><th>Source</th><th>External ID</th><th>Signals</th><th>Winrate</th><th>Avg P&L</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for c in channels %}
+      <tr id="row-{{ c.channel_id }}">
+        <td>{{ c.channel_id }}</td>
+        <td>{{ c.title }} {% if not c.enabled %}<span class="badge">off</span>{% endif %}</td>
+        <td><span class="badge">{{ c.source }}</span></td>
+        <td><code>{{ c.title }}</code></td>
+        <td>{{ c.total }}</td>
+        <td>{% if c.winrate is not none %}{{ "%.1f"|format(c.winrate*100) }}%{% else %}<span class="neutral">—</span>{% endif %}</td>
+        <td class="{% if c.avg_pnl_pct and c.avg_pnl_pct > 0 %}pos{% elif c.avg_pnl_pct and c.avg_pnl_pct < 0 %}neg{% endif %}">
+          {% if c.avg_pnl_pct is not none %}{{ "%.2f"|format(c.avg_pnl_pct) }}%{% else %}<span class="neutral">—</span>{% endif %}
+        </td>
+        <td>
+          <button onclick="toggleChannel({{ c.channel_id }})">{% if c.enabled %}disable{% else %}enable{% endif %}</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<script>
+async function toggleChannel(id) {
+  const r = await fetch(`/channels/${id}/toggle`, {method:'POST'});
+  if (r.ok) location.reload();
+}
+</script>
+{% endblock %}
