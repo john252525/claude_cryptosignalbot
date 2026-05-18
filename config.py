@@ -29,9 +29,14 @@ class Settings(BaseSettings):
     bot_token: str | None = None
     bot_allowed_users: str = ""
 
-    # Parser
+    # LLM parser
+    # Provider: "anthropic" | "deepseek" | "auto" (picks whichever key is set).
+    llm_provider: Literal["anthropic", "deepseek", "auto"] = "auto"
     anthropic_api_key: str | None = None
-    parser_model: str = "claude-haiku-4-5-20251001"
+    anthropic_model: str = "claude-haiku-4-5-20251001"
+    deepseek_api_key: str | None = None
+    deepseek_model: str = "deepseek-chat"
+    deepseek_base_url: str = "https://api.deepseek.com/v1"
 
     # Exchange
     exchange: Literal["binance"] = "binance"

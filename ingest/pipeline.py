@@ -8,7 +8,7 @@ from sqlalchemy import select
 from db import get_session
 from db.models import Channel, Signal, SignalEvent, SignalSide, SignalStatus
 from exchanges.base import PriceFeed
-from parser import LLMSignalParser, ParsedSignal
+from parser import BaseLLMParser, ParsedSignal
 from tracker import ExecutionTracker
 
 log = structlog.get_logger(__name__)
@@ -21,7 +21,7 @@ class IngestPipeline:
     parsing, validation and persistence logic.
     """
 
-    def __init__(self, parser: LLMSignalParser, tracker: ExecutionTracker, feed: PriceFeed) -> None:
+    def __init__(self, parser: BaseLLMParser, tracker: ExecutionTracker, feed: PriceFeed) -> None:
         self._parser = parser
         self._tracker = tracker
         self._feed = feed

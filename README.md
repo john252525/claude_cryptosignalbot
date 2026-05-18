@@ -23,7 +23,7 @@ For local development, see "Quick start" below.
                   │                                            │
                   └────────────────────┬───────────────────────┘
                                        ▼
-                        IngestPipeline  ── LLMSignalParser (Claude Haiku)
+                        IngestPipeline  ── LLM parser (Claude Haiku | DeepSeek)
                                        │            │
                                        │            ▼
                                        │    {symbol, side, entry, TP[], SL}
@@ -46,10 +46,21 @@ For local development, see "Quick start" below.
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-# fill ANTHROPIC_API_KEY and at least one of the ingestion sources
+# fill ANTHROPIC_API_KEY *or* DEEPSEEK_API_KEY, plus at least one ingestion source
 python -m main
 # open http://localhost:8000
 ```
+
+### LLM provider
+
+Set `LLM_PROVIDER=anthropic|deepseek|auto`. With `auto` (default), whichever
+key is present is used; if both are set, Anthropic wins. To force DeepSeek
+even when Anthropic key is also set, use `LLM_PROVIDER=deepseek`.
+
+| Provider  | Model              | ~cost/signal | Note                       |
+|-----------|--------------------|--------------|----------------------------|
+| anthropic | claude-haiku-4-5   | ~$0.001      | Default                    |
+| deepseek  | deepseek-chat      | ~$0.0003     | OpenAI-compatible API      |
 
 ### Ingestion options
 
@@ -146,7 +157,10 @@ phase, not part of the MVP.
 config.py                pydantic-settings, reads .env
 main.py                  orchestrator (boots feed, tracker, sources, web)
 db/models.py             Channel, Signal, SignalEvent
-parser/llm_parser.py     Claude-based signal extractor
+parser/base.py           Shared prompt, JSON extraction, ParsedSignal
+parser/anthropic_parser.py
+parser/deepseek_parser.py
+parser/registry.py       Picks provider from LLM_PROVIDER or auto-detect
 exchanges/base.py        PriceFeed / OrderExecutor abstractions
 exchanges/binance.py     WS + REST impl
 exchanges/registry.py    factory
@@ -173,6 +187,6 @@ pytest -q
   on the same symbol will scale linearly with DB writes — fine for MVP load.
 - Entry detection accepts any candle range overlap with the entry zone. For
   single-price entries the band is `±ENTRY_TOLERANCE_PCT` (default 0.2%).
-- The Anthropic call cost is roughly $0.001 per parsed message (Haiku 4.5).
+- LLM call cost is ~$0.001 per parsed message (Claude Haiku) or ~$0.0003 (DeepSeek).
 - The bot source only processes messages from `BOT_ALLOWED_USERS` (or any user
   if that list is empty — useful for solo deployments).

@@ -19,14 +19,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from db import init_db  # noqa: E402
 from exchanges import get_price_feed  # noqa: E402
 from ingest.pipeline import IngestPipeline  # noqa: E402
-from parser import LLMSignalParser  # noqa: E402
+from parser import get_parser  # noqa: E402
 from tracker import ExecutionTracker  # noqa: E402
 
 
 async def main(text: str, channel: str) -> None:
     await init_db()
     feed = get_price_feed()
-    parser = LLMSignalParser()
+    parser = get_parser()
     tracker = ExecutionTracker(feed)
     pipeline = IngestPipeline(parser=parser, tracker=tracker, feed=feed)
     await pipeline.ingest(

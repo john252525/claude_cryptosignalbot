@@ -14,7 +14,7 @@ from exchanges import get_price_feed
 from ingest import IngestPipeline
 from ingest.bot_source import BotSource
 from ingest.telethon_source import TelethonSource
-from parser import LLMSignalParser
+from parser import get_parser
 from tracker import ExecutionTracker
 from web import create_app
 
@@ -51,16 +51,24 @@ async def main() -> None:
     log = structlog.get_logger("main")
     await init_db()
 
-    if not settings.anthropic_api_key:
-        log.error("missing.anthropic_api_key", hint="set ANTHROPIC_API_KEY in .env")
+    if not (settings.anthropic_api_key or settings.deepseek_api_key):
+        log.error(
+            "missing.llm_api_key",
+            hint="set ANTHROPIC_API_KEY or DEEPSEEK_API_KEY in env",
+        )
         sys.exit(2)
     if not (settings.telethon_enabled or settings.bot_enabled):
         log.error("no_source_enabled", hint="enable TELETHON_ENABLED or BOT_ENABLED in .env")
         sys.exit(2)
 
+    try:
+        parser = get_parser()
+    except Exception as e:
+        log.error("parser.init_failed", error=str(e))
+        sys.exit(2)
+
     feed = get_price_feed()
     await feed.start()
-    parser = LLMSignalParser()
     tracker = ExecutionTracker(feed)
     await tracker.start()
 

@@ -1,3 +1,4 @@
+"""Shared LLM parser logic. Provider-specific code lives in sibling modules."""
 from __future__ import annotations
 
 import json
@@ -6,9 +7,6 @@ from dataclasses import dataclass
 from typing import Literal
 
 import structlog
-from anthropic import AsyncAnthropic
-
-from config import settings
 
 log = structlog.get_logger(__name__)
 
@@ -40,6 +38,8 @@ Rules:
 - If the message is commentary, an update on an existing signal, news, or an ad — set is_signal=false.
 """
 
+# Examples in user/assistant role-pair format. Anthropic uses these as `messages`;
+# OpenAI-compatible providers (DeepSeek) interleave them the same way.
 FEWSHOT = [
     {
         "role": "user",
@@ -117,7 +117,7 @@ class ParsedSignal:
         )
 
 
-def _extract_json(text: str) -> dict:
+def extract_json(text: str) -> dict:
     text = text.strip()
     # Strip optional ``` fences.
     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.IGNORECASE | re.MULTILINE)
@@ -137,72 +137,84 @@ def _extract_json(text: str) -> dict:
     raise ValueError("unbalanced JSON in LLM response")
 
 
-class LLMSignalParser:
-    def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
-        key = api_key or settings.anthropic_api_key
-        if not key:
-            raise RuntimeError("ANTHROPIC_API_KEY is not set")
-        self._client = AsyncAnthropic(api_key=key)
-        self._model = model or settings.parser_model
+def to_parsed_signal(data: dict) -> ParsedSignal:
+    """Normalise an LLM JSON response into a ParsedSignal."""
+    sym = data.get("symbol")
+    if isinstance(sym, str):
+        sym = sym.upper().replace("/", "").replace(" ", "").lstrip("$#")
 
-    async def parse(self, text: str) -> ParsedSignal:
-        messages = list(FEWSHOT) + [{"role": "user", "content": text}]
-        resp = await self._client.messages.create(
-            model=self._model,
-            max_tokens=512,
-            system=SYSTEM_PROMPT,
-            messages=messages,
-        )
-        # Concatenate text blocks (Haiku usually returns a single one).
-        content = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
-        try:
-            data = _extract_json(content)
-        except Exception as e:
-            log.warning("parser.bad_json", error=str(e), content=content[:300])
-            return ParsedSignal(
-                is_signal=False,
-                symbol=None,
-                side=None,
-                market="futures",
-                leverage=None,
-                entry_low=None,
-                entry_high=None,
-                take_profits=[],
-                stop_loss=None,
-                reason=f"bad json: {e}",
-            )
+    tps_raw = data.get("take_profits") or []
+    tps = [float(x) for x in tps_raw if isinstance(x, (int, float))]
 
-        sym = data.get("symbol")
-        if isinstance(sym, str):
-            sym = sym.upper().replace("/", "").replace(" ", "").lstrip("$#")
+    side_raw = data.get("side")
+    side = side_raw.upper() if isinstance(side_raw, str) else None
+    if side not in ("LONG", "SHORT"):
+        side = None
 
-        tps_raw = data.get("take_profits") or []
-        tps = [float(x) for x in tps_raw if isinstance(x, (int, float))]
+    market_raw = data.get("market")
+    market = market_raw.lower() if isinstance(market_raw, str) else "futures"
+    if market not in ("futures", "spot"):
+        market = "futures"
 
-        side_raw = data.get("side")
-        side = side_raw.upper() if isinstance(side_raw, str) else None
-        if side not in ("LONG", "SHORT"):
-            side = None
-        market_raw = data.get("market")
-        market = market_raw.lower() if isinstance(market_raw, str) else "futures"
-        if market not in ("futures", "spot"):
-            market = "futures"
+    return ParsedSignal(
+        is_signal=bool(data.get("is_signal")),
+        symbol=sym or None,
+        side=side,
+        market=market,
+        leverage=_to_float(data.get("leverage")),
+        entry_low=_to_float(data.get("entry_low")),
+        entry_high=_to_float(data.get("entry_high")),
+        take_profits=tps,
+        stop_loss=_to_float(data.get("stop_loss")),
+        reason=str(data.get("reason") or ""),
+    )
 
-        return ParsedSignal(
-            is_signal=bool(data.get("is_signal")),
-            symbol=sym or None,
-            side=side,
-            market=market,
-            leverage=_to_float(data.get("leverage")),
-            entry_low=_to_float(data.get("entry_low")),
-            entry_high=_to_float(data.get("entry_high")),
-            take_profits=tps,
-            stop_loss=_to_float(data.get("stop_loss")),
-            reason=str(data.get("reason") or ""),
-        )
+
+def empty_signal(reason: str) -> ParsedSignal:
+    return ParsedSignal(
+        is_signal=False,
+        symbol=None,
+        side=None,
+        market="futures",
+        leverage=None,
+        entry_low=None,
+        entry_high=None,
+        take_profits=[],
+        stop_loss=None,
+        reason=reason,
+    )
 
 
 def _to_float(v: object) -> float | None:
     if isinstance(v, (int, float)):
         return float(v)
     return None
+
+
+class BaseLLMParser:
+    """Shared parse() pipeline. Subclasses implement `_call_llm(text) -> str`."""
+
+    provider_name: str = "base"
+
+    async def parse(self, text: str) -> ParsedSignal:
+        try:
+            content = await self._call_llm(text)
+        except Exception as e:
+            log.warning("parser.api_error", provider=self.provider_name, error=str(e))
+            return empty_signal(f"api error: {e}")
+
+        try:
+            data = extract_json(content)
+        except Exception as e:
+            log.warning(
+                "parser.bad_json",
+                provider=self.provider_name,
+                error=str(e),
+                content=content[:300],
+            )
+            return empty_signal(f"bad json: {e}")
+
+        return to_parsed_signal(data)
+
+    async def _call_llm(self, text: str) -> str:
+        raise NotImplementedError

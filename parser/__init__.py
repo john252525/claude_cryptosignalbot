@@ -1,3 +1,4 @@
-from parser.llm_parser import LLMSignalParser, ParsedSignal
+from parser.base import BaseLLMParser, ParsedSignal
+from parser.registry import get_parser
 
-__all__ = ["LLMSignalParser", "ParsedSignal"]
+__all__ = ["BaseLLMParser", "ParsedSignal", "get_parser"]

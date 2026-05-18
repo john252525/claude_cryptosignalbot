@@ -6,7 +6,9 @@ Quick walkthrough to deploy this MVP on Railway with Postgres in ~5 minutes.
 
 1. A [Railway](https://railway.com/) account (Hobby plan, $5/mo)
 2. Your repo on GitHub (this one)
-3. `ANTHROPIC_API_KEY` from Anthropic Console
+3. **One** LLM API key:
+   - `ANTHROPIC_API_KEY` from [console.anthropic.com](https://console.anthropic.com/) (~$0.001/signal), or
+   - `DEEPSEEK_API_KEY` from [platform.deepseek.com](https://platform.deepseek.com/) (~3-4× cheaper)
 4. At least one of:
    - **Bot** token from [@BotFather](https://t.me/BotFather) + your Telegram user ID
    - **Telethon** API credentials (api_id + api_hash from https://my.telegram.org)
@@ -43,8 +45,12 @@ Your app now automatically gets the Postgres connection string.
 In the app service → **Variables** → **"Raw Editor"**, paste:
 
 ```env
-# Required
+# Required: one LLM provider key (auto-detected; set both if you want to switch)
 ANTHROPIC_API_KEY=sk-ant-...
+# OR
+DEEPSEEK_API_KEY=sk-...
+# Optional: pin the provider when both keys are set
+# LLM_PROVIDER=anthropic   # or "deepseek" or "auto" (default)
 
 # Pick one (or both)
 
@@ -123,7 +129,7 @@ Just push to GitHub. Railway auto-redeploys on every push to the connected branc
 ## Troubleshooting
 
 **App crashes on startup**: check Logs. Common causes:
-- `missing.anthropic_api_key` → add `ANTHROPIC_API_KEY`
+- `missing.llm_api_key` → add `ANTHROPIC_API_KEY` or `DEEPSEEK_API_KEY`
 - `no_source_enabled` → enable `BOT_ENABLED` or `TELETHON_ENABLED`
 
 **Postgres connection fails**: verify the `DATABASE_URL` variable is referenced
