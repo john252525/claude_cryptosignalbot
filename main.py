@@ -69,6 +69,14 @@ async def main() -> None:
 
     feed = get_price_feed()
     await feed.start()
+
+    # Test REST API connectivity
+    try:
+        price = await feed.get_price("XRPUSDT")
+        log.info("startup.rest_api_test", symbol="XRPUSDT", price=price)
+    except Exception as e:
+        log.warning("startup.rest_api_test_failed", error=str(e))
+
     tracker = ExecutionTracker(feed)
     await tracker.start()
 
