@@ -8,6 +8,14 @@ dashboard so you can decide which sources to forward to a real exchange.
 The exchange layer is abstracted (`exchanges/base.py`) so adding Bybit / OKX /
 etc. is a matter of writing one more `PriceFeed` and registering it.
 
+## Deploy
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new)
+
+→ **[Step-by-step Railway deployment guide](./DEPLOY.md)** (~5 min, ~$15/mo)
+
+For local development, see "Quick start" below.
+
 ## Pipeline
 
 ```

@@ -36,7 +36,12 @@ def _configure_logging() -> None:
 
 
 async def _run_web(app) -> None:
-    cfg = uvicorn.Config(app, host=settings.web_host, port=settings.web_port, log_level="warning")
+    cfg = uvicorn.Config(
+        app,
+        host=settings.web_host,
+        port=settings.effective_port,
+        log_level="warning",
+    )
     server = uvicorn.Server(cfg)
     await server.serve()
 
@@ -94,7 +99,8 @@ async def main() -> None:
         market=settings.exchange_market,
         telethon=settings.telethon_enabled,
         bot=settings.bot_enabled,
-        web=f"http://{settings.web_host}:{settings.web_port}",
+        web=f"http://{settings.web_host}:{settings.effective_port}",
+        db=settings.database_url.split("@")[-1] if "@" in settings.database_url else settings.database_url,
     )
 
     await stop_evt.wait()

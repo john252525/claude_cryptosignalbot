@@ -40,8 +40,10 @@ class Settings(BaseSettings):
     # Web
     web_host: str = "0.0.0.0"
     web_port: int = 8000
+    # Railway/Heroku convention - overrides web_port if set
+    port: int | None = None
 
-    # Storage
+    # Storage. Auto-normalized for asyncpg if pointing at Postgres.
     database_url: str = "sqlite+aiosqlite:///./data/signals.db"
 
     # Behaviour
@@ -53,6 +55,22 @@ class Settings(BaseSettings):
     @classmethod
     def _str(cls, v: object) -> str:
         return str(v or "")
+
+    @field_validator("database_url", mode="after")
+    @classmethod
+    def _normalize_db_url(cls, v: str) -> str:
+        # Railway / Heroku give "postgres://..." or "postgresql://...".
+        # SQLAlchemy 2.x needs explicit driver: "postgresql+asyncpg://...".
+        if v.startswith("postgres://"):
+            v = "postgresql+asyncpg://" + v[len("postgres://"):]
+        elif v.startswith("postgresql://") and "+" not in v.split("://", 1)[0]:
+            v = "postgresql+asyncpg://" + v[len("postgresql://"):]
+        return v
+
+    @property
+    def effective_port(self) -> int:
+        """Railway sets PORT; respect it if present, else fall back to WEB_PORT."""
+        return self.port or self.web_port
 
     @property
     def telethon_channel_list(self) -> list[str]:
