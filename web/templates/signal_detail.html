@@ -12,7 +12,7 @@
     <div><div class="stat">Entered</div><div>{% if sig.entered_at %}{{ sig.entered_at.strftime("%Y-%m-%d %H:%M:%S UTC") }}{% else %}—{% endif %}</div></div>
     <div><div class="stat">Closed</div><div>{% if sig.closed_at %}{{ sig.closed_at.strftime("%Y-%m-%d %H:%M:%S UTC") }}{% else %}—{% endif %}</div></div>
     <div><div class="stat">Entry</div><div>{% if sig.entry_low == sig.entry_high %}{{ "%.6g"|format(sig.entry_low) }}{% else %}{{ "%.6g"|format(sig.entry_low) }}–{{ "%.6g"|format(sig.entry_high) }}{% endif %}</div></div>
-    <div><div class="stat">Stop-loss</div><div>{{ "%.6g"|format(sig.stop_loss) }}</div></div>
+    <div><div class="stat">Stop-loss</div><div>{% if sig.stop_loss is not none %}{{ "%.6g"|format(sig.stop_loss) }}{% else %}<span class="neutral">—</span>{% endif %}</div></div>
     <div><div class="stat">Leverage</div><div>{% if sig.leverage %}{{ sig.leverage }}x{% else %}—{% endif %}</div></div>
     <div>
       <div class="stat">P&L</div>

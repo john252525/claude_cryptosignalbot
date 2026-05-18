@@ -35,7 +35,7 @@
         <td><span class="badge {{ s.side.value }}">{{ s.side.value }}</span></td>
         <td>{% if s.entry_low == s.entry_high %}{{ "%.6g"|format(s.entry_low) }}{% else %}{{ "%.6g"|format(s.entry_low) }}–{{ "%.6g"|format(s.entry_high) }}{% endif %}</td>
         <td>{% for tp in s.take_profits %}{{ "%.6g"|format(tp) }}{% if not loop.last %}, {% endif %}{% endfor %}</td>
-        <td>{{ "%.6g"|format(s.stop_loss) }}</td>
+        <td>{% if s.stop_loss is not none %}{{ "%.6g"|format(s.stop_loss) }}{% else %}<span class="neutral">—</span>{% endif %}</td>
         <td><span class="badge {{ s.status.value }}">{{ s.status.value }}</span></td>
         <td>{% if s.take_profits %}{{ s.last_tp_hit_index + 1 }}/{{ s.take_profits|length }}{% else %}—{% endif %}</td>
         <td class="{% if s.pnl_pct and s.pnl_pct > 0 %}pos{% elif s.pnl_pct and s.pnl_pct < 0 %}neg{% endif %}">
