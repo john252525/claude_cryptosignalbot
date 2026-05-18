@@ -82,8 +82,10 @@ class BinancePriceFeed(PriceFeed):
         sym = symbol.lower()
         async with self._sub_lock:
             if sym in self._subs:
+                log.info("binance.already_subscribed", symbol=sym)
                 return
             self._subs.add(sym)
+        log.info("binance.subscribe_requested", symbol=sym)
         await self._send_subscribe([sym], subscribe=True)
 
     async def unsubscribe(self, symbol: str) -> None:
@@ -155,6 +157,8 @@ class BinancePriceFeed(PriceFeed):
         data = json.loads(raw)
         # SUBSCRIBE/UNSUBSCRIBE replies have only {"result": null, "id": N}.
         if "e" not in data:
+            if "id" in data:
+                log.info("binance.subscription_ack", id=data.get("id"), result=data.get("result"))
             return
         event = data["e"]
         symbol = data["s"]
@@ -176,6 +180,7 @@ class BinancePriceFeed(PriceFeed):
             await self._emit(tick)
 
     async def _emit(self, tick: Tick) -> None:
+        log.info("binance.tick", symbol=tick.symbol, price=tick.price, high=tick.high, low=tick.low)
         for cb in self._callbacks:
             try:
                 await cb(tick)
