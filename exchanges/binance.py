@@ -112,6 +112,7 @@ class BinancePriceFeed(PriceFeed):
             "params": streams,
             "id": self._req_id,
         }
+        log.info("binance.send_subscription", method=msg["method"], streams=streams, id=self._req_id)
         try:
             await self._ws.send(json.dumps(msg))
         except Exception as e:
@@ -154,14 +155,22 @@ class BinancePriceFeed(PriceFeed):
                 backoff = min(backoff * 2, 30)
 
     async def _handle_message(self, raw: str | bytes) -> None:
-        data = json.loads(raw)
+        try:
+            data = json.loads(raw)
+        except Exception as e:
+            log.warning("binance.parse_error", error=str(e))
+            return
+
         # SUBSCRIBE/UNSUBSCRIBE replies have only {"result": null, "id": N}.
         if "e" not in data:
             if "id" in data:
                 log.info("binance.subscription_ack", id=data.get("id"), result=data.get("result"))
+            else:
+                log.debug("binance.msg_no_event", data_keys=list(data.keys()))
             return
+
         event = data["e"]
-        symbol = data["s"]
+        symbol = data.get("s", "unknown")
         if event == "kline":
             k = data["k"]
             high = float(k["h"])
