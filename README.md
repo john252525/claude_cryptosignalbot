@@ -51,16 +51,32 @@ You can run either or both at the same time.
 A user account joins / subscribes to the channels and reads new posts in real time.
 
 1. Get `api_id` and `api_hash` at https://my.telegram.org → API development tools.
-2. `.env`:
+2. **Get session string** (one-time step):
+   - **On Railway** (web shell):
+     ```bash
+     railway run python scripts/get_telethon_session.py
+     # Enter credentials + SMS code → copy SESSION_STRING
+     ```
+   - **On local VPS**:
+     ```bash
+     python scripts/get_telethon_session.py
+     # Enter credentials + SMS code → copy SESSION_STRING
+     ```
+3. `.env`:
    ```
    TELETHON_ENABLED=true
    TELETHON_API_ID=...
    TELETHON_API_HASH=...
    TELETHON_PHONE=+1234567890
+   TELETHON_SESSION_STRING=<paste-from-step-2>
    TELETHON_CHANNELS=daytrader_signals,another_channel
    ```
-3. First run will prompt for the SMS login code in the terminal. Session is
-   cached at `data/signals.session`.
+4. Done. No interactive login on restart needed. Session lives in memory.
+
+**Legacy: file-based session** (if TELETHON_SESSION_STRING not set):
+   First run will prompt for SMS code, session cached at `data/signals.session`.
+   Useful for development but requires file persistence on Railway (volume or keep
+   session file in git after first auth).
 
 **Option B — Bot (works for any channel, even private, via manual forwarding).**
 

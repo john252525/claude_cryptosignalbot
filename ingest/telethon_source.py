@@ -5,6 +5,7 @@ from datetime import timezone
 
 import structlog
 from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 
 from config import settings
 from ingest.pipeline import IngestPipeline
@@ -15,24 +16,42 @@ log = structlog.get_logger(__name__)
 class TelethonSource:
     """Reads new messages from configured public/joined channels via a user account.
 
-    Session file is stored under ./data/<session_name>.session. On first run
-    Telethon will interactively ask for the login code; subsequent runs reuse
-    the session.
+    Session can be provided in two ways:
+      1. TELETHON_SESSION_STRING env var (StringSession) — preferred, no file needed
+      2. File-based session at ./data/<session_name>.session — fallback if env var not set
+
+    On first run (if using file-based), Telethon will interactively ask for the login code;
+    subsequent runs reuse the session. To get SESSION_STRING: run scripts/get_telethon_session.py
     """
 
     def __init__(self, pipeline: IngestPipeline) -> None:
         if not settings.telethon_api_id or not settings.telethon_api_hash:
             raise RuntimeError("TELETHON_API_ID / TELETHON_API_HASH not set")
         self._pipeline = pipeline
+
+        # Prefer StringSession from env, fall back to file-based
+        session = None
+        if settings.telethon_session_string:
+            session = StringSession(settings.telethon_session_string)
+            log.info("telethon.session_source", source="StringSession (env)")
+        else:
+            session = f"data/{settings.telethon_session_name}"
+            log.info("telethon.session_source", source=f"file ({session})")
+
         self._client = TelegramClient(
-            f"data/{settings.telethon_session_name}",
+            session,
             int(settings.telethon_api_id),
             settings.telethon_api_hash,
         )
         self._task: asyncio.Task | None = None
 
     async def start(self) -> None:
-        await self._client.start(phone=settings.telethon_phone)  # type: ignore[arg-type]
+        # For StringSession, don't pass phone (session is already authed)
+        # For file-based, pass phone for interactive login
+        if settings.telethon_session_string:
+            await self._client.start()  # Already authenticated
+        else:
+            await self._client.start(phone=settings.telethon_phone)  # type: ignore[arg-type]
         channels = settings.telethon_channel_list
         if not channels:
             log.warning("telethon.no_channels_configured")

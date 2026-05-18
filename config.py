@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     telethon_api_hash: str | None = None
     telethon_phone: str | None = None
     telethon_session_name: str = "signals"
+    telethon_session_string: str | None = None  # StringSession instead of file
     telethon_channels: str = ""
 
     # Bot
