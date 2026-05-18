@@ -1,17 +1,26 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import timezone
 
 import structlog
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
 from aiogram.types import Message
+from dataclasses import dataclass
 
 from config import settings
 from ingest.pipeline import IngestPipeline
 
 log = structlog.get_logger(__name__)
+
+
+@dataclass
+class _Origin:
+    external_id: str
+    title: str
+    tg_message_id: int | None
 
 
 class BotSource:
@@ -21,11 +30,15 @@ class BotSource:
       1. User adds the bot via @BotFather, puts the token in env, lists their
          user id in BOT_ALLOWED_USERS.
       2. User forwards messages from a signal channel into the bot's DM.
-      3. The bot uses message.forward_origin / forward_from_chat to attribute
-         the signal to the original channel.
+      3. The bot attributes the signal to the original channel using
+         message.forward_origin (aiogram 3.x), falling back to legacy fields.
 
     Non-forwarded messages from whitelisted users are also processed (treated
     as the user pasting a signal manually) — channel attributed to the user.
+
+    Commands:
+      /start  — usage info
+      /test   — reply to a forwarded signal with raw parser output (debug)
     """
 
     def __init__(self, pipeline: IngestPipeline) -> None:
@@ -44,15 +57,50 @@ class BotSource:
         @dp.message(Command("start"))
         async def _start(msg: Message) -> None:
             uid = msg.from_user.id if msg.from_user else 0
-            allowed = (not self._allowed) or uid in self._allowed
-            if allowed:
-                await msg.answer(
-                    "Forward signals from your channels here.\n"
-                    "I will parse them, track TP/SL on Binance, and surface "
-                    "channel-level stats on the web dashboard."
-                )
-            else:
+            if self._allowed and uid not in self._allowed:
                 await msg.answer(f"Not authorized. Your user id is {uid}.")
+                return
+            await msg.answer(
+                "Forward signals from your channels here.\n"
+                "I parse them, track TP/SL on Binance, and surface channel-level "
+                "stats on the web dashboard.\n\n"
+                "Commands:\n"
+                "/test  — show raw parser output for a forwarded message"
+            )
+
+        @dp.message(Command("test"))
+        async def _test(msg: Message) -> None:
+            uid = msg.from_user.id if msg.from_user else 0
+            if self._allowed and uid not in self._allowed:
+                return
+            text = (msg.text or msg.caption or "").removeprefix("/test").strip()
+            if not text:
+                await msg.answer(
+                    "Send `/test <text of signal>` to see raw parser JSON.\n"
+                    "Example:\n"
+                    "/test BTCUSDT LONG entry 60000 tp 61000 62000 sl 59000"
+                )
+                return
+            try:
+                parsed = await self._pipeline._parser.parse(text)
+                payload = {
+                    "is_signal": parsed.is_signal,
+                    "symbol": parsed.symbol,
+                    "side": parsed.side,
+                    "market": parsed.market,
+                    "leverage": parsed.leverage,
+                    "entry_low": parsed.entry_low,
+                    "entry_high": parsed.entry_high,
+                    "take_profits": parsed.take_profits,
+                    "stop_loss": parsed.stop_loss,
+                    "reason": parsed.reason,
+                }
+                await msg.answer(
+                    "```json\n" + json.dumps(payload, indent=2, ensure_ascii=False) + "\n```",
+                    parse_mode="Markdown",
+                )
+            except Exception as e:
+                await msg.answer(f"parser error: {e}")
 
         @dp.message(F.text | F.caption)
         async def _on_message(msg: Message) -> None:
@@ -63,24 +111,25 @@ class BotSource:
             if not text:
                 return
 
-            # Identify origin channel from forward metadata.
-            ext_id, title = _attribution(msg, uid)
+            origin = _attribution(msg, uid)
             posted_at = msg.forward_date or msg.date
             if posted_at and posted_at.tzinfo is None:
                 posted_at = posted_at.replace(tzinfo=timezone.utc)
 
             try:
-                await self._pipeline.ingest(
+                result = await self._pipeline.ingest(
                     source="bot",
-                    channel_external_id=ext_id,
-                    channel_title=title,
-                    tg_message_id=msg.forward_from_message_id,
+                    channel_external_id=origin.external_id,
+                    channel_title=origin.title,
+                    tg_message_id=origin.tg_message_id,
                     text=text,
                     posted_at=posted_at,
                 )
-                await msg.answer("✓ received")
+                await msg.answer(
+                    f"{result.human()}\nchannel: {origin.title}",
+                )
             except Exception as e:
-                log.warning("bot.ingest_error", error=str(e))
+                log.exception("bot.ingest_error", error=str(e))
                 await msg.answer(f"error: {e}")
 
     async def start(self) -> None:
@@ -106,26 +155,33 @@ class BotSource:
                 pass
 
 
-def _attribution(msg: Message, uid: int) -> tuple[str, str]:
-    """Return (external_id, title) for the channel of origin."""
+def _attribution(msg: Message, uid: int) -> _Origin:
+    """Return origin (channel, title, original tg_message_id) for the message."""
     origin = getattr(msg, "forward_origin", None)
     if origin is not None:
-        # MessageOriginChannel / MessageOriginChat / MessageOriginUser
+        # MessageOriginChannel — has chat + message_id
         chat = getattr(origin, "chat", None)
         if chat is not None:
             ext = getattr(chat, "username", None) or str(getattr(chat, "id", "unknown"))
-            return ext, getattr(chat, "title", "") or ext
+            title = getattr(chat, "title", "") or ext
+            return _Origin(ext, title, getattr(origin, "message_id", None))
+        # MessageOriginUser — sender_user
         sender = getattr(origin, "sender_user", None)
         if sender is not None:
             ext = getattr(sender, "username", None) or str(sender.id)
-            return ext, sender.full_name or ext
+            title = sender.full_name or ext
+            return _Origin(ext, title, None)
+        # MessageOriginHiddenUser
         name = getattr(origin, "sender_user_name", None)
         if name:
-            return f"hidden:{name}", name
+            return _Origin(f"hidden:{name}", name, None)
+
     # Legacy forward_from_chat (older clients).
     chat = getattr(msg, "forward_from_chat", None)
     if chat is not None:
         ext = getattr(chat, "username", None) or str(chat.id)
-        return ext, getattr(chat, "title", "") or ext
-    # No forward — attribute to the user.
-    return f"manual:{uid}", f"manual ({uid})"
+        title = getattr(chat, "title", "") or ext
+        return _Origin(ext, title, getattr(msg, "forward_from_message_id", None))
+
+    # No forward — attribute to the user. Use msg.message_id as dedup key.
+    return _Origin(f"manual:{uid}", f"manual ({uid})", msg.message_id)

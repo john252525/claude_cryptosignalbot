@@ -29,14 +29,21 @@ async def main(text: str, channel: str) -> None:
     parser = get_parser()
     tracker = ExecutionTracker(feed)
     pipeline = IngestPipeline(parser=parser, tracker=tracker, feed=feed)
-    await pipeline.ingest(
+    result = await pipeline.ingest(
         source="manual",
         channel_external_id=channel,
         channel_title=channel,
         tg_message_id=None,
         text=text,
     )
-    print("done. Run `python -m main` to start the tracker + web dashboard.")
+    print(f"\nresult: {result.status.value}")
+    if result.signal_id:
+        print(f"signal_id: {result.signal_id}")
+    if result.symbol:
+        print(f"symbol: {result.symbol} {result.side or ''}")
+    if result.detail:
+        print(f"detail: {result.detail}")
+    print("\nRun `python -m main` to start tracker + web dashboard.")
 
 
 if __name__ == "__main__":

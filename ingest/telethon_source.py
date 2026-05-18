@@ -75,13 +75,20 @@ class TelethonSource:
             if posted_at and posted_at.tzinfo is None:
                 posted_at = posted_at.replace(tzinfo=timezone.utc)
             try:
-                await self._pipeline.ingest(
+                result = await self._pipeline.ingest(
                     source="telethon",
                     channel_external_id=str(username),
                     channel_title=title,
                     tg_message_id=event.message.id,
                     text=text,
                     posted_at=posted_at,
+                )
+                log.info(
+                    "telethon.ingested",
+                    channel=username,
+                    status=result.status.value,
+                    signal_id=result.signal_id,
+                    detail=result.detail,
                 )
             except Exception as e:
                 log.warning("telethon.ingest_error", error=str(e))
