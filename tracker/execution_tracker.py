@@ -125,8 +125,8 @@ class ExecutionTracker:
         if sig.status == SignalStatus.ACTIVE:
             tps = sig.take_profits or []
             if sig.side == SignalSide.LONG:
-                # SL first: check if low broke below SL.
-                if tick.low <= sig.stop_loss:
+                # SL first: check if low broke below SL (only if SL is set).
+                if sig.stop_loss is not None and tick.low <= sig.stop_loss:
                     await _close_sl(session, sig, tick)
                     return True
                 # TPs in order.
@@ -147,7 +147,7 @@ class ExecutionTracker:
                     else:
                         break
             else:  # SHORT
-                if tick.high >= sig.stop_loss:
+                if sig.stop_loss is not None and tick.high >= sig.stop_loss:
                     await _close_sl(session, sig, tick)
                     return True
                 for idx in range(sig.last_tp_hit_index + 1, len(tps)):

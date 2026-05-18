@@ -24,7 +24,7 @@ Return ONLY a single JSON object, no prose, no markdown fences. Schema:
   "entry_low": number | null,   // lower bound of entry zone (or the single entry price)
   "entry_high": number | null,  // upper bound (equal to entry_low if a single price)
   "take_profits": [number, ...],// ordered from nearest to furthest from entry
-  "stop_loss": number | null,
+  "stop_loss": number | null,   // may be null for price-level signals if not specified
   "reason": string              // short explanation if is_signal=false; else ""
 }
 
@@ -34,6 +34,10 @@ Rules:
 - "Buy"/"Long"/"Лонг" => LONG. "Sell"/"Short"/"Шорт" => SHORT.
 - "Market entry" or "now" with no number => use the same number for entry_low and entry_high equal to null and set is_signal=false ONLY if you truly can't recover a price; otherwise still try.
 - If take-profit targets are written as TP1/TP2/Target 1/Цель 1, list them in order.
+- Support/resistance level signals: if the message identifies support/resistance zones and price targets:
+  * Use support zone as entry_low/entry_high (LONG) or resistance as entry_low/entry_high (SHORT)
+  * Use stated targets as take_profits
+  * stop_loss may be omitted or inferred if the message doesn't specify one
 - If multiple symbols appear, pick the primary one being signalled.
 - If the message is commentary, an update on an existing signal, news, or an ad — set is_signal=false.
 """
@@ -89,6 +93,32 @@ FEWSHOT = [
             }
         ),
     },
+    {
+        "role": "user",
+        "content": (
+            "#XRP 15m\n"
+            "XRP continues moving within a downtrend channel.\n"
+            "Support at 1.368-1.374. Nearest targets at 1.402 and 1.429.\n"
+            "Loss of support will invalidate the scenario."
+        ),
+    },
+    {
+        "role": "assistant",
+        "content": json.dumps(
+            {
+                "is_signal": True,
+                "symbol": "XRPUSDT",
+                "side": "LONG",
+                "market": "spot",
+                "leverage": None,
+                "entry_low": 1.368,
+                "entry_high": 1.374,
+                "take_profits": [1.402, 1.429],
+                "stop_loss": None,
+                "reason": "",
+            }
+        ),
+    },
 ]
 
 
@@ -106,6 +136,7 @@ class ParsedSignal:
     reason: str = ""
 
     def is_complete(self) -> bool:
+        # Price-level signals may not have explicit SL; require symbol, side, entry, and TPs.
         return bool(
             self.is_signal
             and self.symbol
@@ -113,7 +144,6 @@ class ParsedSignal:
             and self.entry_low is not None
             and self.entry_high is not None
             and self.take_profits
-            and self.stop_loss is not None
         )
 
 
