@@ -76,7 +76,7 @@ class Signal(Base):
 
     entry_low: Mapped[float] = mapped_column(Float)
     entry_high: Mapped[float] = mapped_column(Float)
-    stop_loss: Mapped[float] = mapped_column(Float)
+    stop_loss: Mapped[float | None] = mapped_column(Float, nullable=True)
     # JSON list[float], ordered.
     take_profits: Mapped[list[float]] = mapped_column(JSON, default=list)
 

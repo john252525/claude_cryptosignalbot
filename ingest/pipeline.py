@@ -211,7 +211,7 @@ class IngestPipeline:
                 leverage=parsed.leverage,
                 entry_low=float(parsed.entry_low),  # type: ignore[arg-type]
                 entry_high=float(parsed.entry_high),  # type: ignore[arg-type]
-                stop_loss=float(parsed.stop_loss),  # type: ignore[arg-type]
+                stop_loss=float(parsed.stop_loss) if parsed.stop_loss is not None else None,
                 take_profits=list(parsed.take_profits),
                 status=SignalStatus.PENDING,
                 posted_at=posted_at,
@@ -252,7 +252,7 @@ class IngestPipeline:
                 leverage=parsed.leverage,
                 entry_low=parsed.entry_low or 0.0,
                 entry_high=parsed.entry_high or 0.0,
-                stop_loss=parsed.stop_loss or 0.0,
+                stop_loss=parsed.stop_loss if parsed.stop_loss is not None else None,
                 take_profits=list(parsed.take_profits),
                 status=SignalStatus.INVALID,
                 parse_meta={"reason": reason, "parser_note": parsed.reason},
