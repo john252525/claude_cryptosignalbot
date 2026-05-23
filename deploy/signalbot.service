@@ -1,0 +1,17 @@
+[Unit]
+Description=Crypto Signal Aggregator
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/claude_cryptosignalbot
+EnvironmentFile=/root/claude_cryptosignalbot/.env
+ExecStart=/root/claude_cryptosignalbot/.venv/bin/python -m main
+Restart=always
+RestartSec=5
+StandardOutput=append:/root/claude_cryptosignalbot/logs/app.log
+StandardError=append:/root/claude_cryptosignalbot/logs/app.log
+
+[Install]
+WantedBy=multi-user.target
